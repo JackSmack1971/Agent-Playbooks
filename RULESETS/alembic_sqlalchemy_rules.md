@@ -1,0 +1,436 @@
+---
+trigger: glob
+description: Comprehensive rules for SQLAlchemy 2.0 + Alembic database migrations and ORM usage, covering best practices, common pitfalls, and production-ready patterns
+globs: ["**/*.py", "**/alembic.ini", "**/env.py", "**/alembic/**/*.py"]
+---
+
+# Alembic + SQLAlchemy 2.0 Rules
+
+## SQLAlchemy 2.0 Core Setup
+
+- **MUST use DeclarativeBase for modern SQLAlchemy 2.0 setup**
+  ```python
+  from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+  from sqlalchemy import String, Integer, MetaData
+  
+  # CORRECT: Modern SQLAlchemy 2.0 approach
+  class Base(DeclarativeBase):
+      pass
+  
+  # WRONG: Legacy declarative_base() pattern
+  # from sqlalchemy.ext.declarative import declarative_base
+  # Base = declarative_base()
+  ```
+
+- **ALWAYS use Mapped[] type annotations with mapped_column()**
+  ```python
+  # CORRECT: Type-safe column definitions
+  class User(Base):
+      __tablename__ = "users"
+      
+      id: Mapped[int] = mapped_column(primary_key=True)
+      name: Mapped[str] = mapped_column(String(50))
+      email: Mapped[str | None] = mapped_column(String(100))
+  
+  # WRONG: Old Column() syntax without type hints
+  # id = Column(Integer, primary_key=True)
+  # name = Column(String(50))
+  ```
+
+- **MUST define naming conventions in the base model**
+  ```python
+  from sqlalchemy import MetaData
+  
+  convention = {
+      'all_column_names': lambda constraint, table: '_'.join(
+          [column.name for column in constraint.columns.values()]
+      ),
+      'ix': 'ix__%(table_name)s__%(all_column_names)s',
+      'uq': 'uq__%(table_name)s__%(all_column_names)s', 
+      'ck': 'ck__%(table_name)s__%(constraint_name)s',
+      'fk': 'fk__%(table_name)s__%(all_column_names)s__%(referred_table_name)s',
+      'pk': 'pk__%(table_name)s',
+  }
+  
+  class Base(DeclarativeBase):
+      metadata = MetaData(naming_convention=convention)
+  ```
+
+## Session Management
+
+- **ALWAYS use context managers for session handling**
+  ```python
+  # CORRECT: Automatic session cleanup
+  with Session(engine) as session:
+      result = session.execute(stmt)
+      session.commit()
+  
+  # For async operations
+  async with AsyncSession(engine) as session:
+      result = await session.execute(stmt)
+      await session.commit()
+  
+  # WRONG: Manual session management
+  # session = Session()
+  # result = session.execute(stmt)
+  # session.commit()  # May leak if errors occur
+  ```
+
+- **MUST configure expire_on_commit=False for detached object access**
+  ```python
+  # CORRECT: Prevent detached instance errors
+  Session = sessionmaker(
+      bind=engine,
+      expire_on_commit=False  # Allow access to loaded attributes after commit
+  )
+  
+  # Or when creating engine
+  session = Session(engine, expire_on_commit=False)
+  ```
+
+- **NEVER use Session.rollback() except in error conditions**
+  ```python
+  # CORRECT: Only rollback on actual errors
+  try:
+      with session.begin():
+          session.add(user)
+          # session.commit() called automatically
+  except Exception:
+      # session.rollback() called automatically
+      raise
+  
+  # WRONG: Unnecessary rollback
+  # session.rollback()  # Expires all objects unnecessarily
+  ```
+
+## Alembic Configuration
+
+- **MUST configure alembic.ini for production environments**
+  ```ini
+  [alembic]
+  script_location = alembic
+  file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
+  sqlalchemy.url = ${DATABASE_URL}  # Use environment variables
+  prepend_sys_path = .
+  
+  # Post-write hooks for code formatting
+  [post_write_hooks]
+  hooks = black
+  black.type = console_scripts
+  black.entrypoint = black
+  black.options = -l 79 REVISION_SCRIPT_FILENAME
+  ```
+
+- **MUST properly configure env.py for autogenerate**
+  ```python
+  # env.py critical configuration
+  from myapp.models import Base  # Import your models
+  
+  target_metadata = Base.metadata
+  
+  def run_migrations_online():
+      connectable = engine_from_config(
+          config.get_section(config.config_ini_section),
+          prefix='sqlalchemy.',
+          poolclass=pool.NullPool,
+      )
+  
+      with connectable.connect() as connection:
+          context.configure(
+              connection=connection,
+              target_metadata=target_metadata,
+              compare_type=True,  # Enable type comparison
+              compare_server_default=True,  # Compare defaults
+              render_as_batch=True,  # For SQLite compatibility
+              process_revision_directives=process_revision_directives
+          )
+  
+          with context.begin_transaction():
+              context.run_migrations()
+  ```
+
+## Migration Best Practices
+
+- **NEVER trust autogenerate without manual review**
+  ```bash
+  # CORRECT process:
+  alembic revision --autogenerate -m "add user email column"
+  # THEN manually review and edit the generated migration file
+  # THEN apply: alembic upgrade head
+  
+  # WRONG: Blindly applying autogenerated migrations
+  # alembic revision --autogenerate -m "changes" && alembic upgrade head
+  ```
+
+- **ALWAYS use descriptive migration messages with context**
+  ```python
+  # CORRECT: Descriptive migration header
+  """Add user email column and index for auth lookup
+  
+  Revision ID: 2024_08_21_1430-add_user_email
+  Revises: 1a2b3c4d5e6f
+  Create Date: 2024-08-21 14:30:00.000000
+  
+  Adds email column to users table for authentication.
+  Includes unique index for fast email lookups.
+  """
+  
+  def upgrade():
+      op.add_column('users', sa.Column('email', sa.String(255), nullable=True))
+      op.create_index('ix_users_email_unique', 'users', ['email'], unique=True)
+  
+  def downgrade():
+      op.drop_index('ix_users_email_unique')
+      op.drop_column('users', 'email')
+  ```
+
+- **MUST handle data migrations separately from schema changes**
+  ```python
+  # CORRECT: Schema change first, then data migration
+  def upgrade():
+      # Schema changes
+      op.add_column('users', sa.Column('status', sa.String(20), nullable=True))
+      
+      # Data migration using bulk operations
+      connection = op.get_bind()
+      connection.execute(
+          sa.text("UPDATE users SET status = 'active' WHERE deleted_at IS NULL")
+      )
+      
+      # Make column non-nullable after data population
+      op.alter_column('users', 'status', nullable=False)
+  ```
+
+- **MUST use batch operations for SQLite compatibility**
+  ```python
+  # CORRECT: SQLite-compatible column changes
+  def upgrade():
+      with op.batch_alter_table('users') as batch_op:
+          batch_op.add_column(sa.Column('phone', sa.String(20)))
+          batch_op.create_index('ix_users_phone', ['phone'])
+  
+  def downgrade():
+      with op.batch_alter_table('users') as batch_op:
+          batch_op.drop_index('ix_users_phone')
+          batch_op.drop_column('phone')
+  ```
+
+## Production Migration Safety
+
+- **ALWAYS backup before destructive migrations**
+  ```python
+  # Add to migration docstring:
+  """
+  WARNING: This migration drops the 'old_column' column.
+  REQUIRED: Database backup before applying.
+  COMMAND: pg_dump mydb > backup_$(date +%Y%m%d_%H%M%S).sql
+  """
+  ```
+
+- **MUST test migrations on production-like data**
+  ```python
+  # Include in migration testing strategy
+  def test_migration_performance():
+      """Test migration on dataset similar to production size"""
+      # Create test data that matches production volume
+      # Time the migration execution
+      # Verify data integrity post-migration
+  ```
+
+- **NEVER perform risky operations without staging verification**
+  ```python
+  # CORRECT migration strategy:
+  # 1. Test on local with production-like data
+  # 2. Apply to staging environment  
+  # 3. Verify application functionality
+  # 4. Schedule production maintenance window
+  # 5. Apply with monitoring
+  
+  # WRONG: Direct production application
+  # alembic upgrade head  # on production without testing
+  ```
+
+## Common Anti-Patterns to Avoid
+
+- **NEVER bypass Alembic for schema changes**
+  ```python
+  # WRONG: Direct schema manipulation
+  Base.metadata.create_all(engine)
+  Base.metadata.drop_all(engine)
+  
+  # CORRECT: Always use Alembic migrations
+  # alembic revision -m "create initial tables"
+  # alembic upgrade head
+  ```
+
+- **NEVER use models in migration scripts**
+  ```python
+  # WRONG: Using ORM models in migrations
+  def upgrade():
+      user = User(name="admin")  # Model may change over time
+      session.add(user)
+  
+  # CORRECT: Use table definitions or raw SQL
+  def upgrade():
+      users_table = sa.table('users',
+          sa.column('id', sa.Integer),
+          sa.column('name', sa.String)
+      )
+      op.bulk_insert(users_table, [{'name': 'admin'}])
+  ```
+
+- **NEVER ignore migration order dependencies**
+  ```python
+  # CORRECT: Explicitly handle dependencies
+  # revision = 'abc123'
+  # down_revision = 'def456'
+  # depends_on = ['ghi789']  # For cross-branch dependencies
+  
+  # WRONG: Ignoring revision chains
+  # down_revision = None  # When it should reference previous migration
+  ```
+
+## Testing and Validation
+
+- **MUST implement migration tests**
+  ```python
+  def test_migration_up_and_down():
+      """Test migration applies and reverts cleanly"""
+      # Apply migration
+      alembic_command.upgrade(alembic_cfg, 'head')
+      
+      # Verify schema changes
+      inspector = inspect(engine)
+      assert 'new_column' in [col['name'] for col in inspector.get_columns('users')]
+      
+      # Test downgrade
+      alembic_command.downgrade(alembic_cfg, '-1')
+      
+      # Verify revert
+      inspector = inspect(engine)
+      assert 'new_column' not in [col['name'] for col in inspector.get_columns('users')]
+  ```
+
+- **MUST prevent empty migrations from being generated**
+  ```python
+  # Add to env.py
+  def process_revision_directives(context, revision, directives):
+      if config.cmd_opts.autogenerate:
+          script = directives[0]
+          if script.upgrade_ops.is_empty():
+              directives[:] = []  # Remove empty migration
+  ```
+
+## Performance Considerations  
+
+- **MUST add indexes for foreign key relationships**
+  ```python
+  # CORRECT: Index foreign keys for query performance
+  class Order(Base):
+      __tablename__ = "orders"
+      
+      id: Mapped[int] = mapped_column(primary_key=True)
+      user_id: Mapped[int] = mapped_column(
+          ForeignKey("users.id"), 
+          index=True  # Critical for join performance
+      )
+  ```
+
+- **SHOULD use bulk operations for large data migrations**
+  ```python
+  # CORRECT: Efficient bulk operations
+  def upgrade():
+      connection = op.get_bind()
+      
+      # Bulk insert instead of individual inserts
+      op.bulk_insert(
+          table,
+          [{'col1': 'val1', 'col2': 'val2'} for _ in range(1000)]
+      )
+      
+      # Bulk update with raw SQL for large datasets
+      connection.execute(
+          sa.text("UPDATE large_table SET status = 'migrated' WHERE status IS NULL")
+      )
+  ```
+
+## Known Issues and Mitigations
+
+- **Handle PostgreSQL ENUM changes with dependent views**
+  ```python
+  def upgrade():
+      # Store view definitions before dropping
+      views_to_recreate = {}
+      conn = op.get_bind()
+      
+      # Get dependent views
+      result = conn.execute(sa.text("""
+          SELECT table_name FROM information_schema.views 
+          WHERE table_name IN (
+              SELECT DISTINCT table_name FROM information_schema.columns 
+              WHERE udt_name = 'my_enum_type'
+          )
+      """))
+      
+      for view_name in [row[0] for row in result]:
+          views_to_recreate[view_name] = conn.execute(
+              sa.text(f"SELECT pg_get_viewdef('{view_name}', true)")
+          ).scalar()
+          op.execute(f"DROP VIEW {view_name}")
+      
+      # Update enum type
+      op.sync_enum_values(
+          enum_schema="public",
+          enum_name="my_enum_type", 
+          new_values=["VALUE1", "VALUE2", "NEW_VALUE"],
+          affected_columns=[
+              TableReference(table_schema="public", table_name="my_table", column_name="enum_column")
+          ]
+      )
+      
+      # Recreate views
+      for view_name, definition in views_to_recreate.items():
+          op.execute(sa.text(f"CREATE VIEW {view_name} AS {definition}"))
+  ```
+
+- **Resolve "Can't locate revision" errors**
+  ```bash
+  # Check current database state
+  alembic current
+  
+  # View available revisions  
+  alembic history --verbose
+  
+  # If database is ahead, stamp to correct revision
+  alembic stamp <correct_revision_id>
+  
+  # If behind, upgrade normally
+  alembic upgrade head
+  ```
+
+## Environment-Specific Configuration
+
+- **MUST support multiple deployment environments**
+  ```python
+  # config/environments.py
+  import os
+  from sqlalchemy import create_engine
+  
+  def get_database_url():
+      env = os.getenv('ENVIRONMENT', 'development')
+      
+      urls = {
+          'development': 'postgresql://localhost/myapp_dev',
+          'testing': 'postgresql://localhost/myapp_test', 
+          'staging': 'postgresql://staging-host/myapp',
+          'production': os.getenv('DATABASE_URL')
+      }
+      
+      return urls.get(env)
+  
+  # Use in alembic/env.py
+  from config.environments import get_database_url
+  config.set_main_option('sqlalchemy.url', get_database_url())
+  ```
+
+This ruleset covers the essential patterns and prevents the most common pitfalls when working with SQLAlchemy 2.0 and Alembic migrations. Always prioritize safety, testing, and maintainability over speed of implementation.
