@@ -1,19 +1,31 @@
 ---
-trigger: model_decision
-description: Comprehensive ruleset for Docusaurus static site generator focusing on configuration, project structure, best practices, and common pitfall prevention (Current version: 3.8.1)
-globs: 
-  - "**/docusaurus.config.{js,ts,mjs}"
-  - "**/sidebars.{js,ts,json}"
-  - "**/blog/**/*.{md,mdx}"
-  - "**/docs/**/*.{md,mdx}"
-  - "**/src/pages/**/*.{js,jsx,ts,tsx,md,mdx}"
-  - "**/src/components/**/*.{js,jsx,ts,tsx}"
-  - "**/src/theme/**/*.{js,jsx,ts,tsx}"
+trigger: ["model_decision"]
+description: Comprehensive ruleset for Docusaurus static site generator focusing on configuration, project structure, best practices, and common pitfall prevention
+globs: ["**/docusaurus.config.{js,ts,mjs}", "**/sidebars.{js,ts,json}", "**/blog/**/*.{md,mdx}", "**/docs/**/*.{md,mdx}", "**/src/pages/**/*.{js,jsx,ts,tsx,md,mdx}", "**/src/components/**/*.{js,jsx,ts,tsx}", "**/src/theme/**/*.{js,jsx,ts,tsx}"]
+version: "3.8.1"
+last_updated: "2025-01-01"
 ---
 
 # Docusaurus Rules
 
-## Configuration Fundamentals
+## Installation & Setup
+
+- **MUST** use Node.js 18+ for Docusaurus v3+ compatibility
+- **ALWAYS** initialize projects with `npx create-docusaurus@latest` for latest templates
+- **SHOULD** use TypeScript configuration for better development experience
+
+```bash
+# Create new Docusaurus site
+npx create-docusaurus@latest my-website classic
+
+# Install dependencies
+cd my-website && npm install
+
+# Start development server
+npm run start
+```
+
+## Configuration & Initialization
 
 - Always use the ES module export syntax for modern Docusaurus configurations: `export default { ... }` instead of `module.exports = { ... }`
 - Include essential configuration fields: `title`, `tagline`, `url`, `baseUrl`, `organizationName`, and `projectName`
@@ -46,7 +58,7 @@ export default {
 };
 ```
 
-## Project Structure Standards
+## Core Concepts / API Usage
 
 - Follow the standard Docusaurus directory structure:
   ```
@@ -93,7 +105,23 @@ export default {
 };
 ```
 
-## ESLint Integration
+## Security & Permissions
+
+- Never commit sensitive data to `docusaurus.config.js`
+- Use `customFields` to pass environment variables to client-side safely
+- Validate environment variables with proper fallbacks
+- Use HTTPS URLs for production `url` configuration
+- Implement Content Security Policy headers if hosting allows
+
+## Performance & Scalability
+
+- Enable Webpack optimizations carefully - avoid `experimental_faster: true` in production until stable
+- Optimize images before placing in `static/` directory
+- Use code splitting for large React components with `React.lazy()`
+- Minimize custom CSS and use CSS modules when possible
+- Configure `onBrokenLinks: 'throw'` to catch broken internal links during build
+
+## Error Handling & Troubleshooting
 
 - Use the recommended ESLint configuration for Docusaurus projects
 - Extend `plugin:@docusaurus/recommended` in your `.eslintrc.json`:
@@ -102,6 +130,36 @@ export default {
 {
   "extends": ["plugin:@docusaurus/recommended"]
 }
+```
+
+## Testing
+
+- Run `npm run build` locally before deploying to catch build errors
+- Use `npm run serve` to test production builds locally
+- Implement visual regression testing for theme customizations
+- Check accessibility compliance, especially for custom components
+- Test mobile responsiveness and performance on various devices
+- Validate HTML output and check for broken links regularly
+
+## Deployment & Production Patterns
+
+- Set correct `url` and `baseUrl` for your hosting environment
+- Configure `organizationName` and `projectName` for GitHub Pages deployment
+- Use environment variables for sensitive configuration: `process.env.CUSTOM_FIELD`
+- Set `deploymentBranch` explicitly if not using default `gh-pages`
+- Configure `customFields` for passing environment variables to client-side
+
+```javascript
+export default {
+  url: 'https://myusername.github.io',
+  baseUrl: '/my-project/',
+  organizationName: 'myusername',
+  projectName: 'my-project',
+  deploymentBranch: 'gh-pages',
+  customFields: {
+    teamEmail: process.env.TEAM_EMAIL,
+  },
+};
 ```
 
 ## MDX and Content Best Practices
@@ -176,60 +234,7 @@ export default {
 };
 ```
 
-## Performance and Build Optimization
-
-- Enable Webpack optimizations carefully - avoid `experimental_faster: true` in production until stable
-- Optimize images before placing in `static/` directory
-- Use code splitting for large React components with `React.lazy()`
-- Minimize custom CSS and use CSS modules when possible
-- Configure `onBrokenLinks: 'throw'` to catch broken internal links during build
-
-```javascript
-export default {
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
-  webpack: {
-    jsLoader: (isServer) => ({
-      loader: require.resolve('swc-loader'),
-      options: {
-        jsc: {
-          parser: {
-            syntax: 'typescript',
-            tsx: true,
-          },
-          target: 'es2017',
-        },
-        module: {
-          type: isServer ? 'commonjs' : 'es6',
-        },
-      },
-    }),
-  },
-};
-```
-
-## Deployment Configuration
-
-- Set correct `url` and `baseUrl` for your hosting environment
-- Configure `organizationName` and `projectName` for GitHub Pages deployment
-- Use environment variables for sensitive configuration: `process.env.CUSTOM_FIELD`
-- Set `deploymentBranch` explicitly if not using default `gh-pages`
-- Configure `customFields` for passing environment variables to client-side
-
-```javascript
-export default {
-  url: 'https://myusername.github.io',
-  baseUrl: '/my-project/',
-  organizationName: 'myusername',
-  projectName: 'my-project',
-  deploymentBranch: 'gh-pages',
-  customFields: {
-    teamEmail: process.env.TEAM_EMAIL,
-  },
-};
-```
-
-## Known Issues and Mitigations
+## Known Issues & Mitigations
 
 - **Node.js ESM Import Issues**: With Node.js ≥20.19, verify plugin imports work correctly. Use dynamic imports for ESM-only packages:
 ```javascript
@@ -281,23 +286,6 @@ john:
     github: johndoe
 ```
 
-## Security and Environment Handling
-
-- Never commit sensitive data to `docusaurus.config.js`
-- Use `customFields` to pass environment variables to client-side safely
-- Validate environment variables with proper fallbacks
-- Use HTTPS URLs for production `url` configuration
-- Implement Content Security Policy headers if hosting allows
-
-## Testing and Quality Assurance
-
-- Run `npm run build` locally before deploying to catch build errors
-- Use `npm run serve` to test production builds locally
-- Implement visual regression testing for theme customizations
-- Check accessibility compliance, especially for custom components
-- Test mobile responsiveness and performance on various devices
-- Validate HTML output and check for broken links regularly
-
 ## Advanced Configuration Patterns
 
 - Use async config functions for dynamic imports
@@ -310,7 +298,7 @@ john:
 // Advanced async configuration
 export default async function createConfigAsync() {
   const remarkPlugin = await import('remark-plugin');
-  
+
   return {
     title: 'My Site',
     presets: [
@@ -326,3 +314,17 @@ export default async function createConfigAsync() {
   };
 }
 ```
+
+## Version Compatibility Notes
+
+- **Current version tested**: Docusaurus 3.8.1
+- **Node.js compatibility**: Requires Node.js 18+
+- **React compatibility**: Uses React 18+ features
+- **Migration considerations**: Major breaking changes in v3.x series
+
+## References
+
+- [Docusaurus Official Documentation](https://docusaurus.io/)
+- [Docusaurus GitHub Repository](https://github.com/facebook/docusaurus)
+- [Community Resources](https://docusaurus.io/community)
+- [Migration Guide](https://docusaurus.io/docs/migration)

@@ -1,12 +1,31 @@
 ---
-trigger: glob
+trigger: ["glob"]
 description: Comprehensive rules for Biome v2+ linting configuration, covering setup, rule management, troubleshooting, and best practices for JavaScript/TypeScript projects
 globs: ["**/biome.json", "**/biome.jsonc", "**/.biomerc.json"]
+version: "2.0"
+last_updated: "2025-01-01"
 ---
 
 # Biome Linter Rules
 
-## Configuration File Structure
+## Installation & Setup
+
+- **MUST** install Biome v2+ for latest features and performance improvements
+- **ALWAYS** initialize configuration with `biome init` for new projects
+- **SHOULD** integrate with existing tooling (ESLint migration, IDE extensions)
+
+```bash
+# Install Biome
+npm install --save-dev --save-exact @biomejs/biome
+
+# Initialize configuration
+npx biome init
+
+# Migrate from ESLint (if applicable)
+npx biome migrate eslint --write
+```
+
+## Configuration & Initialization
 
 - **ALWAYS** use `biome.json` or `biome.jsonc` as the primary configuration file
 - **INCLUDE** the JSON schema reference for IDE autocomplete: `"$schema": "https://biomejs.dev/schemas/1.8.1/schema.json"`
@@ -25,7 +44,7 @@ globs: ["**/biome.json", "**/biome.jsonc", "**/.biomerc.json"]
 }
 ```
 
-## Rule Categories and Severity Management
+## Core Concepts / API Usage
 
 - **USE** rule severity levels: `"error"`, `"warn"`, `"info"`, `"off"`
 - **UNDERSTAND** that v2 changed default severities - style rules no longer emit errors by default
@@ -272,7 +291,7 @@ biome migrate eslint --include-inspired --include-nursery --write
 }
 ```
 
-## Code Suppression Techniques
+## Error Handling & Troubleshooting
 
 - **SUPPRESS** single lines: `// biome-ignore lint/suspicious/noExplicitAny: <explanation>`
 - **SUPPRESS** entire files: `// biome-ignore-all lint/suspicious/noConsole: <explanation>`
@@ -295,28 +314,26 @@ function complexGeneratedFunction() {
 // biome-ignore-end
 ```
 
-## Type-Aware Rules (v2+)
+## Testing
 
-- **ENABLE** type-aware rules like `noFloatingPromises` for enhanced analysis
-- **CONFIGURE** TypeScript-specific rules in nursery category
-- **UNDERSTAND** that type inference doesn't require TypeScript compiler installation
+- **MUST** run Biome in CI pipelines to catch issues early
+- **ALWAYS** use `--error-on-warnings` in CI for strict quality gates
+- **SHOULD** integrate with pre-commit hooks for developer workflow
 
-```json
-{
-  "linter": {
-    "rules": {
-      "nursery": {
-        "noFloatingPromises": "error"
-      },
-      "correctness": {
-        "noUnusedVariables": "error"
-      }
-    }
-  }
-}
+```bash
+# Pre-commit hook example
+#!/bin/sh
+npx biome lint --write --error-on-warnings src/
+npx biome format --write src/
 ```
 
-## Known Issues and Mitigations
+## Deployment & Production Patterns
+
+- **MUST** ensure consistent Biome versions across development and CI
+- **ALWAYS** pin Biome version in package.json for reproducible builds
+- **SHOULD** use Biome's LSP integration for consistent IDE experience
+
+## Known Issues & Mitigations
 
 - **FILE PATTERN ISSUES**: After v2 migration, verify file patterns work correctly with `biome check --verbose`
 - **RULE SEVERITY CHANGES**: Style rules may need explicit error levels in v2
@@ -324,30 +341,16 @@ function complexGeneratedFunction() {
 - **CI INTEGRATION**: Use `--error-on-warnings` if warnings should fail CI
 - **MEMORY USAGE**: For large codebases, use file includes/excludes to limit scope
 
-## Best Practices
+## Version Compatibility Notes
 
-- **START** with recommended rules and gradually customize
-- **DOCUMENT** rule suppressions with clear explanations
-- **REGULAR** updates to latest Biome version for bug fixes and new rules
-- **TEAM** alignment on rule severity levels and suppression policies
-- **CI** integration with appropriate error handling and reporting
-- **PERFORMANCE** monitoring on large codebases with targeted configuration
+- **Current version tested**: Biome v2.0+
+- **Breaking changes**: v1 to v2 migration requires configuration review
+- **New features**: Type-aware rules available in v2+ nursery category
+- **Performance improvements**: Significant speed improvements in v2
 
-## Integration with Development Tools
+## References
 
-- **VSCODE**: Use official Biome extension with `"biome.lspBin"` setting
-- **NEOVIM**: Configure LSP for formatting and code actions on save
-- **WEBPACK/VITE**: Integrate with build process using appropriate plugins
-- **GITHUB ACTIONS**: Use `--reporter=github` for CI-friendly output
-- **PRE-COMMIT**: Add Biome to pre-commit hooks for automatic checking
-
-```json
-// VS Code settings.json
-{
-  "editor.defaultFormatter": "biomejs.biome",
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.biome": "explicit"
-  }
-}
-```
+- [Biome Official Documentation](https://biomejs.dev/)
+- [Biome Configuration Schema](https://biomejs.dev/schemas/1.8.1/schema.json)
+- [Migration Guide](https://biomejs.dev/guides/migrate-eslint/)
+- [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=biomejs.biome)

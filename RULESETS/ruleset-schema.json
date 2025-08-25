@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ruleset Front Matter Schema",
+  "description": "Schema for validating ruleset front matter",
+  "type": "object",
+  "properties": {
+    "trigger": {
+      "description": "Array of trigger types that activate this ruleset",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["glob", "model_decision", "file_extension", "content_pattern"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "description": {
+      "description": "One-sentence description of the ruleset",
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 200
+    },
+    "globs": {
+      "description": "Array of file patterns that this ruleset applies to",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[^\\s]+$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "version": {
+      "description": "Version of the technology this ruleset covers",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?(-[a-zA-Z0-9]+)?$"
+    },
+    "last_updated": {
+      "description": "Date when this ruleset was last updated",
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": ["trigger", "description", "globs"]
+}

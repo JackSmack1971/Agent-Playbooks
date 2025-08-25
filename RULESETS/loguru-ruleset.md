@@ -1,12 +1,14 @@
 ---
-trigger: glob
+trigger: ["glob"]
 description: Comprehensive ruleset for loguru Python logging library, covering installation, configuration, usage patterns, multiprocessing, async operations, performance optimization, and security best practices
 globs: ["**/*.py"]
+version: "0.7.2"
+last_updated: "2025-01-01"
 ---
 
 # Loguru Rules
 
-## Installation and Setup
+## Installation & Setup
 
 - **Install loguru using pip**: `pip install loguru` - no additional dependencies required
 - **Import with single line**: `from loguru import logger` - ready to use immediately with zero configuration
@@ -24,7 +26,7 @@ from loguru import logger
 logger.info("Loguru is ready!")
 ```
 
-## Basic Usage and Configuration
+## Configuration & Initialization
 
 - **Remove default handler first**: Always call `logger.remove()` before adding custom handlers to avoid duplicate logs
 - **Use logger.add() for configuration**: Add sinks with `logger.add(sink, **options)` - supports files, stdout/stderr, functions, and custom handlers
@@ -58,7 +60,7 @@ logger.add(
 )
 ```
 
-## Message Formatting and Context
+## Core Concepts / API Usage
 
 - **Use braces for interpolation**: Use `logger.info("User {name} logged in", name=username)` instead of f-strings for lazy evaluation
 - **Avoid f-strings in log messages**: F-strings are evaluated even when log level is disabled, wasting CPU cycles
@@ -101,163 +103,7 @@ logger.add(
 )
 ```
 
-## Exception Handling and Debugging
-
-- **Use logger.exception() for caught exceptions**: Automatically includes traceback information
-- **Enable backtrace and diagnose for debugging**: Set `backtrace=True` and `diagnose=True` for detailed error context
-- **Use @logger.catch decorator**: Automatically log unhandled exceptions in functions with full traceback
-- **Disable diagnose in production**: Set `diagnose=False` in production to avoid exposing sensitive variable values
-
-```python
-# Exception logging with context
-try:
-    result = risky_operation()
-except Exception as e:
-    logger.exception("Failed to complete operation for user {user_id}", user_id=current_user.id)
-
-# Catch decorator for automatic exception handling
-@logger.catch
-def critical_function():
-    # Any unhandled exception will be automatically logged
-    return perform_operation()
-
-# Development vs production configuration
-logger.add(
-    "errors.log",
-    level="ERROR",
-    backtrace=True,
-    diagnose=False,  # Set to False in production for security
-    format="{time} | {level} | {message}"
-)
-```
-
-## Multiprocessing and Concurrency
-
-- **Use enqueue=True for multiprocessing**: Enables thread-safe and process-safe logging through internal queue
-- **Specify multiprocessing context**: Pass `context` parameter when using different multiprocessing start methods
-- **Initialize logger before forking**: Set up logging configuration in main process before creating worker processes
-- **Avoid fork-unsafe operations**: Don't add handlers with threads after forking processes
-
-```python
-import multiprocessing
-from loguru import logger
-
-def worker_function(task_id):
-    logger.info("Worker {} processing task", task_id)
-    return task_id * 2
-
-if __name__ == "__main__":
-    # Configure logger before creating processes
-    logger.remove()
-    logger.add(
-        "multiprocess.log",
-        enqueue=True,  # Required for multiprocessing safety
-        format="{time} | {level} | {process} | {message}"
-    )
-    
-    # Use spawn context for better compatibility
-    context = multiprocessing.get_context("spawn")
-    with context.Pool(4) as pool:
-        results = pool.map(worker_function, range(10))
-```
-
-## Async and Asynchronous Operations
-
-- **Use enqueue=True for async applications**: Prevents blocking of async event loops during log writes
-- **Avoid blocking sinks in async code**: Use async-compatible sinks or queue-based writing
-- **Configure before event loop**: Set up logging before starting async event loops or frameworks
-
-```python
-import asyncio
-from loguru import logger
-
-# Configure for async usage
-logger.remove()
-logger.add(
-    "async_app.log",
-    enqueue=True,  # Non-blocking async-safe logging
-    format="{time} | {level} | {message}",
-    level="INFO"
-)
-
-async def async_operation(item_id):
-    logger.info("Starting async operation for item {}", item_id)
-    await asyncio.sleep(1)  # Simulate async work
-    logger.info("Completed async operation for item {}", item_id)
-
-async def main():
-    tasks = [async_operation(i) for i in range(5)]
-    await asyncio.gather(*tasks)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-## Structured Logging and JSON Output
-
-- **Enable JSON serialization**: Use `serialize=True` for machine-readable log format
-- **Include correlation IDs**: Use .bind() to add request IDs, trace IDs, or correlation identifiers
-- **Structure extra fields consistently**: Maintain consistent field names across your application
-- **Use for log aggregation systems**: JSON format integrates well with ELK stack, Splunk, or cloud logging
-
-```python
-# JSON logging configuration
-logger.add(
-    "structured.log",
-    serialize=True,  # Output in JSON format
-    format="{time} | {level} | {message}",
-    level="INFO"
-)
-
-# Adding structured context
-request_logger = logger.bind(
-    request_id="req-12345",
-    user_id=789,
-    endpoint="/api/users",
-    method="POST"
-)
-
-request_logger.info("Request started")
-request_logger.info("Validation completed")
-request_logger.info("Request completed", response_time_ms=150)
-```
-
-## Performance Optimization
-
-- **Set appropriate log levels**: Use INFO or WARNING in production, avoid DEBUG level for performance
-- **Use lazy evaluation**: Prefer brace formatting over f-strings for conditional log evaluation
-- **Enable enqueue for I/O intensive logging**: Prevents blocking main thread during file writes
-- **Monitor log volume**: Implement log sampling or rate limiting for high-volume applications
-
-```python
-# Performance-optimized configuration
-logger.remove()
-
-# Production console logging - minimal overhead
-logger.add(
-    sys.stderr,
-    level="WARNING",  # Only warnings and errors to console
-    format="{time:HH:mm:ss} | {level} | {message}",
-    colorize=False    # Disable colors for better performance
-)
-
-# Async file logging for better performance
-logger.add(
-    "app.log",
-    level="INFO",
-    enqueue=True,     # Non-blocking writes
-    rotation="100 MB",
-    compression="gz",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-)
-
-# Conditional expensive logging
-if logger.isEnabledFor("DEBUG"):
-    expensive_data = compute_debug_info()
-    logger.debug("Debug info: {}", expensive_data)
-```
-
-## Security and Production Considerations
+## Security & Permissions
 
 - **Disable diagnose in production**: Set `diagnose=False` to prevent exposing variable values in tracebacks
 - **Sanitize sensitive data**: Never log passwords, API keys, or personal information
@@ -298,33 +144,99 @@ logger.add(
 )
 ```
 
-## Library Integration and Testing
+## Performance & Scalability
 
-- **Disable library loggers in production**: Use `logger.disable("library_name")` to suppress third-party library logs
-- **Enable for testing**: Use `logger.enable("library_name")` to re-enable logs during debugging
-- **Configure for testing frameworks**: Integrate with pytest and other testing tools appropriately
-- **Use consistent logger names**: Use `__name__` for logger identification in modules
+- **Set appropriate log levels**: Use INFO or WARNING in production, avoid DEBUG level for performance
+- **Use lazy evaluation**: Prefer brace formatting over f-strings for conditional log evaluation
+- **Enable enqueue for I/O intensive logging**: Prevents blocking main thread during file writes
+- **Monitor log volume**: Implement log sampling or rate limiting for high-volume applications
 
 ```python
-# Library integration
-from loguru import logger
+# Performance-optimized configuration
+logger.remove()
 
-# Disable noisy third-party libraries
-logger.disable("urllib3")
-logger.disable("requests")
-logger.disable("boto3")
+# Production console logging - minimal overhead
+logger.add(
+    sys.stderr,
+    level="WARNING",  # Only warnings and errors to console
+    format="{time:HH:mm:ss} | {level} | {message}",
+    colorize=False    # Disable colors for better performance
+)
 
-# Re-enable for debugging when needed
-# logger.enable("requests")
+# Async file logging for better performance
+logger.add(
+    "app.log",
+    level="INFO",
+    enqueue=True,     # Non-blocking writes
+    rotation="100 MB",
+    compression="gz",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
+)
 
-# Module-specific logging
-module_logger = logger.bind(module=__name__)
-
-def library_function():
-    module_logger.info("Function called in {}", __name__)
+# Conditional expensive logging
+if logger.isEnabledFor("DEBUG"):
+    expensive_data = compute_debug_info()
+    logger.debug("Debug info: {}", expensive_data)
 ```
 
-## Environment-Specific Configuration
+## Error Handling & Troubleshooting
+
+- **Use logger.exception() for caught exceptions**: Automatically includes traceback information
+- **Enable backtrace and diagnose for debugging**: Set `backtrace=True` and `diagnose=True` for detailed error context
+- **Use @logger.catch decorator**: Automatically log unhandled exceptions in functions with full traceback
+- **Disable diagnose in production**: Set `diagnose=False` in production to avoid exposing sensitive variable values
+
+```python
+# Exception logging with context
+try:
+    result = risky_operation()
+except Exception as e:
+    logger.exception("Failed to complete operation for user {user_id}", user_id=current_user.id)
+
+# Catch decorator for automatic exception handling
+@logger.catch
+def critical_function():
+    # Any unhandled exception will be automatically logged
+    return perform_operation()
+
+# Development vs production configuration
+logger.add(
+    "errors.log",
+    level="ERROR",
+    backtrace=True,
+    diagnose=False,  # Set to False in production for security
+    format="{time} | {level} | {message}"
+)
+```
+
+## Testing
+
+- **Test logging configuration**: Verify log files are created and rotated correctly
+- **Mock logger for unit tests**: Use `logger.remove()` and add test-specific handlers
+- **Verify log levels**: Ensure appropriate log levels are set for different environments
+- **Test structured logging**: Validate JSON output format and field inclusion
+
+```python
+import pytest
+from loguru import logger
+import io
+
+def test_logging_configuration():
+    """Test that logging is configured correctly"""
+    logger.remove()
+
+    # Add test-specific handler
+    log_stream = io.StringIO()
+    logger.add(log_stream, level="INFO", format="{level} | {message}")
+
+    # Test logging
+    logger.info("Test message")
+    log_output = log_stream.getvalue()
+
+    assert "INFO | Test message" in log_output
+```
+
+## Deployment & Production Patterns
 
 - **Load config before imports**: Ensure environment variables are set before importing loguru
 - **Use environment variables**: Leverage `LOGURU_LEVEL`, `LOGURU_FORMAT` for runtime configuration
@@ -338,9 +250,9 @@ from loguru import logger
 # Environment-specific configuration
 def configure_logging():
     logger.remove()
-    
+
     environment = os.getenv("ENVIRONMENT", "development")
-    
+
     if environment == "production":
         # Production: JSON logs, higher level
         logger.add(
@@ -361,14 +273,14 @@ def configure_logging():
             level="DEBUG",
             format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}:{function}:{line}</cyan> - <level>{message}</level>"
         )
-    
+
     return logger
 
 # Call before application starts
 configure_logging()
 ```
 
-## Known Issues and Mitigations
+## Known Issues & Mitigations
 
 - **Environment variable timing**: Load environment configuration before importing loguru to ensure proper settings
 - **Stream redirection issues**: Tools like pytest may redirect stdout/stderr, causing handler exceptions - use dynamic stream references
@@ -394,21 +306,22 @@ if __name__ == "__main__":
     # Configure logging BEFORE starting processes
     logger.remove()
     logger.add("safe.log", enqueue=True)
-    
+
     # Now safe to start multiprocessing
     import multiprocessing
     # ... rest of code
 ```
 
-## Best Practices Summary
+## Version Compatibility Notes
 
-- **Always call logger.remove() first** when configuring custom handlers
-- **Use enqueue=True for concurrent applications** (multiprocessing, threading, async)
-- **Set diagnose=False in production** to avoid exposing sensitive variable data
-- **Implement proper log rotation and retention** to manage disk space
-- **Use structured logging with context** for better observability
-- **Load configuration before importing loguru** to ensure proper initialization
-- **Monitor log volume and performance impact** in production environments
-- **Sanitize sensitive data** before logging to prevent data exposure
-- **Use appropriate log levels** for different environments (DEBUG in dev, INFO+ in prod)
-- **Test logging configuration** in all deployment environments before production release
+- **Current version tested**: Loguru 0.7.2
+- **Python compatibility**: Supports Python 3.6+
+- **Breaking changes**: Major API changes between versions - test thoroughly when upgrading
+- **Performance improvements**: Significant improvements in newer versions for high-volume logging
+
+## References
+
+- [Loguru Official Documentation](https://loguru.readthedocs.io/)
+- [Loguru GitHub Repository](https://github.com/Delgan/loguru)
+- [Python Logging Best Practices](https://docs.python.org/3/howto/logging.html)
+- [Structured Logging Guide](https://www.structlog.org/)
